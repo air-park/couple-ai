@@ -25,10 +25,12 @@ const LOCKED_TEASERS = [
   { name: "친구", emoji: "🧑‍🤝‍🧑", teaser: "이 장면은 한쪽이 좀 얄밉게 들렸을 것 같아." },
 ];
 
-const PLACEHOLDER = `A: 왜 또 늦어? 맨날 이렇게 늦잖아
+const PLACEHOLDER = `대화형 예시)
+A: 왜 또 늦어? 맨날 이렇게 늦잖아
 B: 나도 일이 있었거든? 항상 이해를 못 해
-A: 내가 언제 이해를 못 했어
-B: 지난번에도 그랬잖아`;
+
+서술형 예시)
+오늘 남자친구가 갑자기 화를 냈어요. 저는 그냥 저녁 메뉴를 물어봤을 뿐인데 "맨날 네가 정해"라고 짜증을 내더라고요.`;
 
 // ── Shared persona card ────────────────────────────────────────────────────
 
@@ -262,7 +264,7 @@ export default function Home() {
                     </span>
                   </div>
                   {error && <p className="text-red-400 text-sm px-1">{error}</p>}
-                  <p className="text-xs text-gray-400 px-1">A, B 또는 이름을 넣으면 더 정확해요</p>
+                  <p className="text-xs text-gray-400 px-1">대화 캡처·서술형 모두 가능 · A/B 또는 이름을 넣으면 더 정확해요</p>
                   <button
                     type="submit"
                     disabled={loading || !conversation.trim()}
