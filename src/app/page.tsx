@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type {
   AnalysisResult,
   FreePersona,
@@ -8,6 +8,9 @@ import type {
   PaidAnalysisResult,
 } from "./api/analyze/route";
 import { ImageUploadFlow } from "@/components/ImageUploadFlow";
+import { PaymentButton } from "@/components/PaymentButton";
+import { createClient } from "@/lib/supabase";
+import type { User } from "@supabase/supabase-js";
 
 // ── Static data ────────────────────────────────────────────────────────────
 
@@ -47,7 +50,6 @@ function PersonaCard({
 
   return (
     <div className="bg-white rounded-3xl overflow-hidden shadow-[0_2px_24px_rgba(0,0,0,0.07)] border border-gray-100/80">
-      {/* Header */}
       <div className="flex items-center justify-between px-6 pt-6 pb-5">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-rose-50 flex items-center justify-center text-lg shrink-0">
@@ -67,7 +69,6 @@ function PersonaCard({
         )}
       </div>
 
-      {/* Score */}
       <div className="px-6 pb-5 border-b border-gray-50">
         <div className="flex items-end justify-between mb-3">
           <div>
@@ -92,13 +93,11 @@ function PersonaCard({
         </div>
       </div>
 
-      {/* Verdict */}
       <div className="px-6 py-5 border-b border-gray-50">
         <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2">패널 의견</p>
         <p className="text-gray-800 font-semibold text-sm leading-relaxed">{persona.oneLineVerdict}</p>
       </div>
 
-      {/* Trigger */}
       <div className="px-6 py-5 border-b border-gray-50 bg-gray-50/60">
         <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2.5">
           마음을 더 상하게 한 말
@@ -110,12 +109,10 @@ function PersonaCard({
         <p className="text-gray-400 text-xs leading-relaxed pl-5">{persona.why}</p>
       </div>
 
-      {/* Summary */}
       <div className={`px-6 py-4 ${reconciliation ? "border-b border-gray-50" : ""}`}>
         <p className="text-gray-400 text-xs leading-relaxed">{persona.summary}</p>
       </div>
 
-      {/* Reconciliation (paid only) */}
       {reconciliation && (
         <div className="px-6 py-4 bg-green-50/40">
           <p className="text-[10px] font-semibold text-green-600 uppercase tracking-widest mb-1.5">
@@ -138,10 +135,7 @@ function LockedRow({ name, emoji, teaser }: { name: string; emoji: string; tease
         <p className="text-xs font-semibold text-gray-400 leading-none mb-0.5">{name}</p>
         <p className="text-xs text-gray-300 truncate">{teaser}</p>
       </div>
-      <div className="flex items-center gap-2 shrink-0">
-        <span className="text-xs text-gray-200">🔒</span>
-        <span className="text-xs font-semibold text-rose-400">보기</span>
-      </div>
+      <span className="text-xs text-gray-200 shrink-0">🔒</span>
     </div>
   );
 }
@@ -154,6 +148,16 @@ export default function Home() {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [user, setUser] = useState<User | null | undefined>(undefined); // undefined = loading
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => setUser(data.user ?? null));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   async function analyze(text: string, tier: "free" | "paid") {
     setLoading(true);
@@ -161,10 +165,13 @@ export default function Home() {
     setResult(null);
 
     try {
+      const body: Record<string, unknown> = { conversation: text, tier };
+      if (result?.sessionId) body.sessionId = result.sessionId;
+
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conversation: text, tier }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || "오류가 발생했습니다."); return; }
@@ -197,10 +204,30 @@ export default function Home() {
     <div className="min-h-screen bg-white">
       <div className="absolute inset-x-0 top-0 h-[520px] bg-gradient-to-b from-rose-50/60 via-rose-50/20 to-transparent pointer-events-none" />
 
+      {/* Nav */}
+      <nav className="relative flex items-center justify-between max-w-5xl mx-auto px-6 pt-5">
+        <span className="text-sm font-bold text-gray-900">AI 갈등 패널</span>
+        {user === undefined ? null : user ? (
+          <button
+            onClick={() => createClient().auth.signOut().then(() => setUser(null))}
+            className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            로그아웃
+          </button>
+        ) : (
+          <a
+            href="/login"
+            className="text-xs font-semibold text-gray-600 hover:text-gray-900 transition-colors"
+          >
+            로그인
+          </a>
+        )}
+      </nav>
+
       <div className="relative max-w-5xl mx-auto px-6">
 
         {/* ── Hero ── */}
-        <div className="text-center pt-20 pb-14">
+        <div className="text-center pt-16 pb-14">
           <div className="inline-flex items-center gap-2 bg-white border border-rose-100 shadow-sm text-rose-500 text-xs font-semibold px-4 py-1.5 rounded-full mb-8">
             <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse" />
             AI 갈등 패널 · 베타
@@ -222,7 +249,6 @@ export default function Home() {
             {/* ── Input form ── */}
             <div className="max-w-lg mx-auto pb-20">
 
-              {/* Tab toggle */}
               <div className="flex gap-1 bg-gray-100 rounded-2xl p-1 mb-4">
                 <button
                   onClick={() => setInputMode("text")}
@@ -325,11 +351,25 @@ export default function Home() {
               ))}
             </div>
 
-            <div className="mt-12 text-center">
-              <p className="text-xs text-gray-400 mb-4">나머지 4개 패널의 시각이 궁금하다면</p>
-              <button className="bg-rose-500 hover:bg-rose-600 text-white font-semibold px-8 py-3.5 rounded-full transition-colors text-sm shadow-sm">
-                전체 의견 열어보기
-              </button>
+            {/* Payment CTA */}
+            <div className="mt-8">
+              <p className="text-xs text-gray-400 text-center mb-4">
+                나머지 4개 패널 + 핵심 오해 + 화해 제안까지
+              </p>
+              {result.sessionId ? (
+                <PaymentButton
+                  sessionId={result.sessionId}
+                  onError={(msg) => setError(msg)}
+                />
+              ) : (
+                <button
+                  onClick={() => window.location.href = `/login?next=/`}
+                  className="w-full bg-rose-500 hover:bg-rose-600 text-white font-semibold py-4 rounded-2xl transition-colors text-sm shadow-sm"
+                >
+                  전체 의견 열어보기 · 3,900원
+                </button>
+              )}
+              {error && <p className="text-red-400 text-xs text-center mt-3">{error}</p>}
             </div>
           </div>
         ) : (
@@ -363,7 +403,6 @@ function PaidResult({
         </button>
       </div>
 
-      {/* All persona cards */}
       <div className="space-y-4">
         {result.personas.map((persona, i) => (
           <PersonaCard
@@ -375,7 +414,6 @@ function PaidResult({
         ))}
       </div>
 
-      {/* Misunderstanding */}
       <div className="mt-6 bg-white rounded-3xl border border-gray-100 shadow-[0_2px_24px_rgba(0,0,0,0.05)] px-6 py-5">
         <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2">
           핵심 오해
@@ -383,7 +421,6 @@ function PaidResult({
         <p className="text-gray-700 text-sm leading-relaxed">{result.misunderstanding}</p>
       </div>
 
-      {/* Final mediator comment */}
       <div className="mt-3 bg-rose-50/60 rounded-3xl border border-rose-100/80 px-6 py-5">
         <p className="text-[10px] font-semibold text-rose-400 uppercase tracking-widest mb-2">
           AI Mediator 종합 코멘트
@@ -391,9 +428,20 @@ function PaidResult({
         <p className="text-gray-700 text-sm leading-relaxed">{result.finalMediatorComment}</p>
       </div>
 
+      {result.sessionId && (
+        <div className="mt-6 text-center">
+          <a
+            href={`/result/${result.sessionId}`}
+            className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            공유 링크 보기 →
+          </a>
+        </div>
+      )}
+
       <button
         onClick={onReset}
-        className="mt-10 w-full text-xs text-gray-400 hover:text-gray-600 transition-colors py-2"
+        className="mt-8 w-full text-xs text-gray-400 hover:text-gray-600 transition-colors py-2"
       >
         다시 분석하기
       </button>
